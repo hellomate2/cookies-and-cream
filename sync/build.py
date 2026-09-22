@@ -57,6 +57,19 @@ def main():
 
     with open(SRC, encoding="utf-8") as f:
         data = json.load(f)
+
+    # surface staged Gmail drafts on the page, without ever publishing their text
+    dpath = os.path.join(ROOT, "sync", "drafts.json")
+    try:
+        with open(dpath, encoding="utf-8") as f:
+            ds = json.load(f)
+        data["drafts"] = [
+            {"thread_id": x.get("thread_id"), "because": x.get("because"), "made_at": x.get("made_at")}
+            for x in (ds.get("drafts") or [])
+        ]
+        data["drafts_checked_at"] = ds.get("checked_at")
+    except (OSError, ValueError):
+        data["drafts"] = data.get("drafts") or []
     digest = payload_digest(data)
     prev = None
     if os.path.exists(OUT):

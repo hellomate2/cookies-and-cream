@@ -108,6 +108,8 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .upnext-t { font-size: 1.5rem; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; color: var(--org); }
 .upnext.bad .upnext-t { color: var(--red); }
 .upnext-s { font-size: .82rem; color: var(--fg3); margin-top: 2px; }
+.draftbar { margin: 8px 0 0; padding: 12px 14px; border-radius: var(--r); background: var(--blu-bg); border: 1px solid #1d3a55; }
+.draftbar a { font-weight: 700; }
 .evbar { margin: 8px 0 0; padding: 10px 14px; border-radius: var(--r); background: var(--bg2); border: 1px solid var(--line); font-size: .86rem; }
 .evrow { padding: 3px 0; color: var(--fg2); }
 .evrow b { color: var(--yel); font-weight: 600; }
@@ -230,6 +232,8 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .exam { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
 .exam:last-child { border-bottom: 0; }
 .exam b { color: var(--yel); }
+.exam.school b { color: var(--blu); }
+.evrow b.sch { color: var(--blu); }
 .exam .tiny { margin-top: 2px; }
 .warn { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--yel-bg); color: var(--fg); font-size: .88rem; border: 1px solid #4a4218; }
 

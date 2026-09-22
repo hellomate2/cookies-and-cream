@@ -295,6 +295,18 @@ function viewNow() {
     }
   }
 
+  // replies already written and sitting in Gmail waiting to be checked and sent
+  const drafts = DATA.drafts || [];
+  if (who === ME && drafts.length) {
+    const box = el("div", "draftbar");
+    const a = el("a", null, `${drafts.length} repl${drafts.length > 1 ? "ies" : "y"} drafted and waiting in Gmail`);
+    a.href = "https://mail.google.com/mail/u/0/#drafts";
+    a.target = "_blank"; a.rel = "noopener";
+    box.appendChild(a);
+    box.appendChild(el("div", "tiny", "Nothing is ever sent for you. Read it, fix it, send it yourself."));
+    v.appendChild(box);
+  }
+
   // anything with a date and a place, so nobody misses a physical event
   const soonEvents = (DATA.events || [])
     .map(e => ({ ...e, d: parseDue(e.when) }))
@@ -304,8 +316,9 @@ function viewNow() {
     const box = el("div", "evbar");
     soonEvents.forEach(e => {
       const row = el("div", "evrow");
-      row.appendChild(el("b", null, absTime(e.d)));
-      row.appendChild(document.createTextNode(" " + e.what + (e.where ? " · " + e.where : "")));
+      const sch = /^SCHOOL:/.test(e.what || "");
+      row.appendChild(el("b", sch ? "sch" : null, absTime(e.d)));
+      row.appendChild(document.createTextNode(" " + (e.what || "").replace(/^SCHOOL:\s*/, "") + (e.where ? " · " + e.where : "")));
       box.appendChild(row);
     });
     v.appendChild(box);
@@ -576,11 +589,12 @@ function viewCal() {
     const h = el("h2", null, "Commitments"); h.appendChild(el("small", null, String(future.length)));
     v.appendChild(h);
     future.forEach(e => {
-      const d = el("div", "exam");
+      const school = /^SCHOOL:/.test(e.what || "");
+      const d = el("div", "exam" + (school ? " school" : ""));
       const who = (e.who || []).includes("ALL") ? "Whole PC" : (e.who || []).join(", ");
-      d.appendChild(el("b", null, who || "PC"));
+      d.appendChild(el("b", null, school ? "Class" : (who || "PC")));
       const when = e.d ? absTime(e.d) : (e.when_text || "no date given");
-      d.appendChild(document.createTextNode(` — ${e.what}`));
+      d.appendChild(document.createTextNode(" " + (e.what || "").replace(/^SCHOOL:\s*/, "")));
       const sub = el("div", "tiny");
       sub.textContent = when + (e.where ? " · " + e.where : "") + (e.thread_subject ? " · " + e.thread_subject : "");
       d.appendChild(sub);
