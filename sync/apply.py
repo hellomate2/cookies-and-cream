@@ -34,6 +34,17 @@ STATE = os.path.join(ROOT, "sync", "state.json")
 def norm(s):
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
+def _write_atomic(path, text):
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text); f.flush(); os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp): os.unlink(tmp)
+        raise
+
 def load(p, default):
     if not os.path.exists(p):
         return default
@@ -101,9 +112,12 @@ def main():
         if name in ps:
             ps[name]["bans"] = []
             changed.append(f"{name}: bans cleared")
+        else:
+            changed.append("WARNING unknown pledge in bans_clear: %r" % name)
     for b in patch.get("bans_add", []):
         p = ps.get(b.get("name"))
         if not p:
+            changed.append("WARNING unknown pledge in bans_add: %r" % b.get("name"))
             continue
         rec = {k: b.get(k) for k in ("from", "until", "by", "reason")}
         if not any(x.get("until") == rec["until"] and x.get("by") == rec["by"] for x in p["bans"]):
@@ -112,6 +126,7 @@ def main():
     for item in patch.get("punishments_add", []):
         p = ps.get(item.get("name"))
         if not p:
+            changed.append("WARNING unknown pledge in punishments_add: %r" % item.get("name"))
             continue
         txt = item.get("text", "")
         if norm(txt)[:50] not in [norm(x)[:50] for x in p["running_punishments"]]:
@@ -121,6 +136,7 @@ def main():
         for item in patch.get(fld, []):
             p = ps.get(item.get("name"))
             if not p:
+                changed.append("WARNING unknown pledge in %s: %r" % (fld, item.get("name")))
                 continue
             txt = item.get("text", "")
             if txt and norm(txt)[:40] not in norm(p.get(fld, "")):
@@ -149,16 +165,14 @@ def main():
         d["away"] = patch["away_set"]
         changed.append("away list updated")
 
-    with open(TRACKER, "w", encoding="utf-8") as f:
-        json.dump(d, f, indent=1, ensure_ascii=False)
+    _write_atomic(TRACKER, json.dumps(d, indent=1, ensure_ascii=False))
 
     st = load(STATE, {})
     if patch.get("seen_message_id"):
         st["seen_message_id"] = patch["seen_message_id"]
     st["seen_at"] = patch.get("seen_at") or datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     st["last_changes"] = changed[-20:]
-    with open(STATE, "w", encoding="utf-8") as f:
-        json.dump(st, f, indent=1)
+    _write_atomic(STATE, json.dumps(st, indent=1))
 
     if changed:
         print(f"{len(changed)} change(s):")
@@ -167,6 +181,10 @@ def main():
     else:
         print("no changes")
 
+    if any(c.startswith("WARNING") or c.startswith("NO MATCH") for c in changed):
+        print("!! review the warnings above: something in the patch did not land")
+
+    sys.stdout.flush()
     args = [sys.executable, os.path.join(ROOT, "sync", "build.py")]
     if "--push" in sys.argv:
         args.append("--push")

@@ -1,11 +1,13 @@
 /* Cookies and Cream — Alpha Theta pledge tracker.
    Data lives encrypted in data.enc; the passphrase never leaves the browser. */
 
-const PLEDGES = ["Dev","Max","Advait","Arjun","Shri","Pragyan","Namith","Anthony","Sarkis","Tanish","Casey","Paul","Garrett"];
+let PLEDGES = [];   // filled from the decrypted payload; never hardcoded, this file is public
 const DAYNAME = ["","Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const LS_ME = "cc.me", LS_PASS = "cc.pass", LS_TAB = "cc.tab", LS_DAY = "cc.day";
 
 let DATA = null, ME = null, TAB = "now", FILTER = "mine", QUERY = "", CALDAY = null;
+
+function setData(d) { DATA = d; PLEDGES = (d && d.pledges) || []; }
 const $ = (s, r = document) => r.querySelector(s);
 const el = (t, c, txt) => { const n = document.createElement(t); if (c) n.className = c; if (txt != null) n.textContent = txt; return n; };
 const esc = s => String(s == null ? "" : s);
@@ -80,7 +82,14 @@ function banFor(name) {
   const ps = (DATA.pledge_status || []).find(p => p.name === name);
   if (!ps || !ps.bans) return null;
   const t = now();
-  return ps.bans.find(b => { const u = parseDue(b.until), f = parseDue(b.from); return u && u > t && (!f || f <= t); }) || null;
+  // until === null means indefinite: still in force until an active lifts it
+  return ps.bans.find(b => {
+    const f = parseDue(b.from);
+    if (f && f > t) return false;
+    if (b.until === null || b.until === undefined) return true;
+    const u = parseDue(b.until);
+    return u ? u > t : true;
+  }) || null;
 }
 const isBanned = name => !!banFor(name);
 
@@ -128,7 +137,13 @@ function taskCard(t) {
     : who.join(", ");
   const chip = el("span", "chip" + (ownedBy(t, ME) ? " me" : ""), label);
   meta.appendChild(chip);
+  if (isGroup(t) && Array.isArray(t.done_by) && t.done_by.length) {
+    const owed = assignedTo(t).filter(p => !t.done_by.includes(p));
+    meta.appendChild(el("span", "chip done-by", `${t.done_by.length} in`));
+    if (owed.length) meta.appendChild(el("span", "chip owing", "still owed: " + owed.join(", ")));
+  }
   meta.appendChild(el("span", "chip from", "from " + (t.assigned_by_address || t.assigned_by)));
+  if (t.proof && !/^none/i.test(t.proof)) meta.appendChild(el("span", "chip proof", t.proof));
   card.appendChild(meta);
 
   const more = el("div", "t-more");
@@ -235,8 +250,10 @@ function viewBoard() {
 
     if (ban) {
       const b = el("div", "p-ban");
-      b.appendChild(el("b", null, "Email banned"));
-      b.appendChild(document.createTextNode(` until ${absTime(parseDue(ban.until))} (${ban.by}${ban.reason ? ", " + ban.reason : ""})`));
+      b.appendChild(el("b", null, ban.scope ? "Partly banned" : "Email banned"));
+      const u = ban.until ? "until " + absTime(parseDue(ban.until)) : "indefinitely";
+      const sc = ban.scope ? ` from ${ban.scope},` : "";
+      b.appendChild(document.createTextNode(`${sc} ${u} (${ban.by}${ban.reason ? ", " + ban.reason : ""})`));
       c.appendChild(b);
     }
     (ps.running_punishments || []).forEach(p => {
@@ -395,6 +412,26 @@ function viewCal() {
     v.appendChild(el("div", "warn", "Do not hand these guys a task during someone's midterm. Check here first."));
   }
 
+  /* dated commitments pulled out of the threads */
+  const evs = (DATA.events || []).map(e => ({ ...e, d: parseDue(e.when) }))
+    .sort((a, b) => (a.d ? a.d.getTime() : 8e15) - (b.d ? b.d.getTime() : 8e15));
+  const future = evs.filter(e => !e.d || e.d >= new Date(t.getFullYear(), t.getMonth(), t.getDate()));
+  if (future.length) {
+    const h = el("h2", null, "Commitments"); h.appendChild(el("small", null, String(future.length)));
+    v.appendChild(h);
+    future.forEach(e => {
+      const d = el("div", "exam");
+      const who = (e.who || []).includes("ALL") ? "Whole PC" : (e.who || []).join(", ");
+      d.appendChild(el("b", null, who || "PC"));
+      const when = e.d ? absTime(e.d) : (e.when_text || "no date given");
+      d.appendChild(document.createTextNode(` — ${e.what}`));
+      const sub = el("div", "tiny");
+      sub.textContent = when + (e.where ? " · " + e.where : "") + (e.thread_subject ? " · " + e.thread_subject : "");
+      d.appendChild(sub);
+      v.appendChild(d);
+    });
+  }
+
   /* day picker */
   const days = el("div", "days");
   [1, 2, 3, 4, 5, 6, 7].forEach(dn => {
@@ -471,7 +508,10 @@ function updateBanner() {
   b.textContent = "";
   if (ban) {
     b.className = "banner";
-    b.appendChild(document.createTextNode(`Do not email. You are banned until ${absTime(parseDue(ban.until))}.`));
+    const untilTxt = ban.until ? "until " + absTime(parseDue(ban.until)) : "indefinitely, until it is lifted";
+    b.appendChild(document.createTextNode(ban.scope
+      ? `Do not email about ${ban.scope}. Restricted ${untilTxt}.`
+      : `Do not email at all. You are banned ${untilTxt}.`));
     const s = el("span", "tiny", `${ban.by}${ban.reason ? " — " + ban.reason : ""}. Sending anyway is its own punishment.`);
     b.appendChild(s);
     b.hidden = false;
@@ -522,7 +562,7 @@ function syncLabel() {
 }
 
 function boot(data) {
-  DATA = data;
+  setData(data);
   $("#gate").hidden = true;
 
   const sel = $("#me");
@@ -551,7 +591,7 @@ async function refresh() {
     if (!r.ok) return;
     const b = await r.json();
     if (DATA && b.generated_at === DATA.generated_at) { syncLabel(); return; }
-    DATA = await decrypt(b, PASS);
+    setData(await decrypt(b, PASS));
     render(); syncLabel();
   } catch (e) { /* offline is fine, keep showing what we have */ }
 }
@@ -559,18 +599,35 @@ async function refresh() {
 async function tryOpen(pass, fromStorage) {
   const err = $("#gateErr");
   err.textContent = "opening…";
+  let bundle;
   try {
     const r = await fetch("data.enc?t=" + Date.now(), { cache: "no-store" });
-    if (!r.ok) throw new Error("data.enc is missing (" + r.status + ")");
-    const bundle = await r.json();
+    if (!r.ok) throw new Error("fetch:" + r.status);
+    bundle = await r.json();
+  } catch (e) {
+    // Network problem, not a bad passphrase. Keep what is saved so a pledge on
+    // bad signal is not locked out, and offer a retry.
+    err.textContent = "Cannot reach the data right now. Check your signal.";
+    if (fromStorage) {
+      const again = el("button", null, "Retry");
+      again.type = "button";
+      again.onclick = () => tryOpen(pass, true);
+      err.appendChild(document.createTextNode(" "));
+      err.appendChild(again);
+    }
+    return;
+  }
+  try {
     const data = await decrypt(bundle, pass);
     PASS = pass;
     try { localStorage.setItem(LS_PASS, pass); } catch (e) {}
     err.textContent = "";
     boot(data);
   } catch (e) {
-    if (fromStorage) { try { localStorage.removeItem(LS_PASS); } catch (x) {} err.textContent = ""; return; }
-    err.textContent = /missing/.test(e.message) ? e.message : "Wrong passphrase.";
+    // Only a genuine decrypt failure means the passphrase is wrong.
+    try { localStorage.removeItem(LS_PASS); } catch (x) {}
+    if (fromStorage) { err.textContent = "The passphrase changed. Enter the new one."; return; }
+    err.textContent = "Wrong passphrase.";
     const c = $(".gate-card"); c.classList.remove("shake"); void c.offsetWidth; c.classList.add("shake");
   }
 }
