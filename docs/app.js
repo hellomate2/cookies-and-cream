@@ -61,7 +61,14 @@ function ptNow() {
   };
 }
 
-function parseDue(s) { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d; }
+function parseDue(s) {
+  if (!s || typeof s !== "string") return null;
+  // must at least be YYYY-MM-DD; a bare year or a stray number is an extraction
+  // error, and treating it as a date invents an overdue task that does not exist
+  if (!/^\d{4}-\d{2}-\d{2}/.test(s.trim())) return null;
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
 
 function relTime(d, ref) {
   if (!d) return "no deadline";
@@ -78,14 +85,23 @@ function relTime(d, ref) {
   return past ? s + " late" : "in " + s;
 }
 
+/* Everything is stated in Berkeley time, including "today" and "tomorrow", so a
+   pledge in New York reads the same words the deadline was written in. */
+function ptYMD(d) {
+  try {
+    const p = new Intl.DateTimeFormat("en-CA", { timeZone: PT, year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(d).reduce((o, x) => (o[x.type] = x.value, o), {});
+    return `${p.year}-${p.month}-${p.day}`;
+  } catch (e) { return d.toISOString().slice(0, 10); }
+}
 function absTime(d) {
   if (!d) return "";
-  const t = now(), sameDay = d.toDateString() === t.toDateString();
-  const tm = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  if (sameDay) return "today " + tm;
-  const tm2 = new Date(t.getTime() + 864e5);
-  if (d.toDateString() === tm2.toDateString()) return "tomorrow " + tm;
-  return d.toLocaleDateString([], { weekday: "short", month: "numeric", day: "numeric" }) + " " + tm;
+  const tm = d.toLocaleTimeString([], { timeZone: PT, hour: "numeric", minute: "2-digit" });
+  const here = ptYMD(d), today = ptYMD(now());
+  if (here === today) return "today " + tm;
+  const tmw = ptYMD(new Date(now().getTime() + 864e5));
+  if (here === tmw) return "tomorrow " + tm;
+  return d.toLocaleDateString([], { timeZone: PT, weekday: "short", month: "numeric", day: "numeric" }) + " " + tm;
 }
 
 const urgency = d => { if (!d) return "none"; const ms = d - now(); return ms < 0 ? "overdue" : ms < 6 * 36e5 ? "soon" : ""; };
@@ -129,7 +145,13 @@ function ownedBy(t, who) {
   if (!who) return false;
   if (a.includes(who)) return true;
   if (a.includes("ALL")) return true;
-  if (a.includes("UNBANNED")) return !isBanned(who);
+  // "any one of you" is everybody's problem until somebody does it
+  if (a.includes("ANY_ONE") || a.includes("ANY_TWO")) return true;
+  if (a.includes("UNBANNED")) {
+    if (!isBanned(who)) return true;
+    // if every single person is banned the task still belongs to someone
+    return PLEDGES.every(p => isBanned(p));
+  }
   return false;
 }
 const isDone = t => t.status === "accepted" || t.status === "cancelled";
@@ -193,13 +215,17 @@ function taskCard(t) {
 
   const head = el("div", "t-head");
   const left = el("div", "t-left");
-  const tick = el("button", "tick" + (isTicked(t) ? " on" : ""));
-  tick.type = "button";
-  tick.setAttribute("aria-pressed", isTicked(t) ? "true" : "false");
-  tick.title = isTicked(t) ? "Mark as not done" : "Mark done (only on this device)";
-  tick.onclick = (ev) => { ev.stopPropagation(); toggleTick(t); render(true); };
-  left.appendChild(tick);
-  left.appendChild(el("div", "t-what", t.what));
+  if (ME && ownedBy(t, ME)) {
+    const tick = el("button", "tick" + (isTicked(t) ? " on" : ""));
+    tick.type = "button";
+    tick.setAttribute("aria-pressed", isTicked(t) ? "true" : "false");
+    tick.title = isTicked(t) ? "Mark as not done" : "Mark done (your own note, this device only)";
+    tick.onclick = (ev) => { ev.stopPropagation(); toggleTick(t); render(true); };
+    left.appendChild(tick);
+  } else {
+    left.appendChild(el("span", "tick-gap"));
+  }
+  left.appendChild(el("div", "t-what", t.what || "(no description)"));
   head.appendChild(left);
   const dueBox = el("div", "t-due " + (isLive(t) ? u : "") + (due ? "" : " none"));
   const meWho = currentWho();
@@ -290,7 +316,12 @@ function viewNow() {
     const lateN = n.filter(t => { const d = parseDue(t.due); return d && d < now(); }).length;
     const b = el("button", (who === p ? "on " : "") + (p === ME ? "self" : ""));
     b.appendChild(document.createTextNode(p));
-    if (n.length) b.appendChild(el("span", "n" + (lateN ? " bad" : ""), String(lateN || n.length)));
+    // always the total outstanding; red only signals that some of it is late
+    if (n.length) {
+      const badge = el("span", "n" + (lateN ? " bad" : ""), String(n.length));
+      badge.title = lateN ? `${n.length} to do, ${lateN} of them late` : `${n.length} to do`;
+      b.appendChild(badge);
+    }
     b.onclick = () => { WHO = p; render(); };
     strip.appendChild(b);
   });
@@ -306,7 +337,7 @@ function viewNow() {
     if (pick) {
       const box = el("div", "upnext" + (oldest ? " bad" : ""));
       box.appendChild(el("div", "upnext-k", oldest ? "Most overdue" : "Up next"));
-      box.appendChild(el("div", "upnext-w", pick.what));
+      box.appendChild(el("div", "upnext-w", pick.what || "(no description)"));
       const cd = el("div", "upnext-t rel", relTime(parseDue(pick.due)));
       cd.dataset.due = pick.due;
       box.appendChild(cd);
@@ -314,7 +345,7 @@ function viewNow() {
       sub.textContent = (pick.assigned_by_address || pick.assigned_by || "") +
         (pick.proof && !/^none/i.test(pick.proof) ? " · needs " + pick.proof : "");
       box.appendChild(sub);
-      box.onclick = () => { TAB = "now"; QUERY = pick.what.slice(0, 28); render(); };
+      box.onclick = () => { const q = (pick.what || "").slice(0, 28); if (q.trim()) { TAB = "now"; QUERY = q; render(); } };
       v.appendChild(box);
     }
   }
@@ -459,7 +490,8 @@ function viewBoard() {
       mine.slice(0, 8).forEach(t => {
         const d = parseDue(t.due), u = urgency(d);
         const li = el("li", u);
-        li.textContent = t.what.length > 90 ? t.what.slice(0, 88) + "…" : t.what;
+        const w = t.what || "(no description)";
+        li.textContent = w.length > 90 ? w.slice(0, 88) + "\u2026" : w;
         li.appendChild(el("span", "tiny", "  " + relTime(d)));
         ul.appendChild(li);
       });
@@ -612,7 +644,7 @@ function viewCal() {
     upcoming.forEach(e => {
       const d = el("div", "exam");
       d.appendChild(el("b", null, e.who.join(", ")));
-      d.appendChild(document.createTextNode(` — ${e.what}, ${new Date(e.date + "T12:00:00-07:00").toLocaleDateString([], { timeZone: PT, weekday: "long", month: "short", day: "numeric" })}${e.time ? ", " + e.time : ""}`));
+      d.appendChild(document.createTextNode(` — ${e.what}, ${new Date(e.date + "T12:00:00-07:00").toLocaleDateString([], { timeZone: PT, weekday: "long", month: "short", day: "numeric" })}${e.time ? ", " + e.time + " Berkeley time" : ""}`));
       v.appendChild(d);
     });
     v.appendChild(el("div", "warn", "Do not hand these guys a task during someone's midterm. Check here first."));
@@ -653,7 +685,7 @@ function viewCal() {
   slots.forEach(s => {
     const live = CALDAY === today && mins >= hm(s.start) && mins < hm(s.end);
     const d = el("div", "slot" + (live ? " now" : ""));
-    d.appendChild(el("div", "time", fmtHM(s.start) + " – " + fmtHM(s.end)));
+    d.appendChild(el("div", "time", fmtHM(s.start) + " to " + fmtHM(s.end)));
     const r = el("div");
     r.appendChild(el("div", "what", s.what));
     const names = el("div", "names");
@@ -663,7 +695,7 @@ function viewCal() {
     d.appendChild(r);
     v.appendChild(d);
   });
-  v.appendChild(el("div", "tiny", "Source: the Cookies and Cream shared Google Calendar. Only people who put their schedule in show up here."));
+  v.appendChild(el("div", "tiny", "All times on this page are Berkeley time, wherever you are reading it. Source: the Cookies and Cream shared Google Calendar, so only people who put their schedule in appear here."));
   v.appendChild(foot());
   return v;
 }
@@ -770,6 +802,7 @@ function syncLabel() {
 
 function boot(data) {
   setData(data);
+  loadTicks();
   $("#gate").hidden = true;
 
   const sel = $("#me");
@@ -777,11 +810,18 @@ function boot(data) {
   const o0 = el("option", null, "who are you?"); o0.value = ""; sel.appendChild(o0);
   PLEDGES.forEach(p => { const o = el("option", null, p); o.value = p; sel.appendChild(o); });
   try { ME = localStorage.getItem(LS_ME) || ""; } catch (e) { ME = ""; }
+  if (ME && !PLEDGES.includes(ME)) { ME = ""; try { localStorage.removeItem(LS_ME); } catch (e) {} }
   sel.value = ME || "";
   sel.onchange = () => { ME = sel.value; WHO = undefined; try { localStorage.setItem(LS_ME, ME); } catch (e) {} render(); };
 
   [...$("#tabs").children].forEach(b => b.onclick = () => { TAB = b.dataset.tab; QUERY = ""; try { localStorage.setItem(LS_TAB, TAB); } catch (e) {} render(); });
-  try { TAB = localStorage.getItem(LS_TAB) || "now"; CALDAY = +localStorage.getItem(LS_DAY) || null; } catch (e) {}
+  const TABS = ["now", "board", "rules", "actives", "cal", "threads"];
+  try {
+    const savedTab = localStorage.getItem(LS_TAB);
+    TAB = TABS.includes(savedTab) ? savedTab : "now";
+    const dayN = Number(localStorage.getItem(LS_DAY));
+    CALDAY = (dayN >= 1 && dayN <= 7) ? dayN : null;
+  } catch (e) { TAB = "now"; CALDAY = null; }
 
   render();
   syncLabel();
