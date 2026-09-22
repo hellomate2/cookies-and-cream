@@ -41,6 +41,8 @@ button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 h2 { font-size: 1.05rem; margin: 22px 0 10px; letter-spacing: .01em; color: var(--fg); }
 h2 small { color: var(--fg3); font-weight: 500; margin-left: 6px; }
+h3.sub { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--fg3); margin: 16px 0 2px; font-weight: 700; }
+h3.sub small { font-weight: 500; margin-left: 6px; letter-spacing: 0; }
 .tiny { font-size: .78rem; color: var(--fg3); }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: var(--bg3); padding: 1px 5px; border-radius: 5px; }
 
@@ -113,6 +115,11 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .card.soon { border-color: #5a4318; }
 .card.done { opacity: .55; }
 .t-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.t-left { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.tick { flex: 0 0 auto; width: 26px; height: 26px; margin-top: 1px; border-radius: 7px; border: 2px solid var(--line); background: var(--bg3); padding: 0; position: relative; }
+.tick:hover { border-color: var(--fg2); }
+.tick.on { background: var(--grn); border-color: var(--grn); }
+.tick.on::after { content: ""; position: absolute; left: 7px; top: 3px; width: 6px; height: 12px; border: solid #06230f; border-width: 0 2.5px 2.5px 0; transform: rotate(42deg); }
 .t-what { font-weight: 600; font-size: 1rem; }
 .t-due { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .t-due .rel { display: block; font-weight: 700; }
@@ -124,6 +131,7 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .chip { display: inline-block; font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bg3); color: var(--fg2); border: 1px solid var(--line); }
 .chip.me { background: var(--acc); color: #000; border-color: var(--acc); }
 .chip.from { background: transparent; }
+.chip.when { background: transparent; color: var(--fg3); }
 .chip.proof { background: var(--blu-bg); color: var(--blu); border-color: #1d3a55; }
 .chip.done-by { background: var(--grn-bg); color: var(--grn); border-color: #1f4a2e; }
 .chip.owing { background: var(--org-bg); color: var(--org); border-color: #4a3a18; }

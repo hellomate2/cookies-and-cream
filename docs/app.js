@@ -3,7 +3,16 @@
 
 let PLEDGES = [];   // filled from the decrypted payload; never hardcoded, this file is public
 const DAYNAME = ["","Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-const LS_ME = "cc.me", LS_PASS = "cc.pass", LS_TAB = "cc.tab", LS_DAY = "cc.day";
+const LS_ME = "cc.me", LS_PASS = "cc.pass", LS_TAB = "cc.tab", LS_DAY = "cc.day", LS_TICK = "cc.ticked";
+
+/* Tasks you have ticked off yourself. Stored on this device only: the page is
+   static, so a tick is your own note, not something the others see. */
+let TICKED = new Set();
+function loadTicks() { try { TICKED = new Set(JSON.parse(localStorage.getItem(LS_TICK) || "[]")); } catch (e) { TICKED = new Set(); } }
+function saveTicks() { try { localStorage.setItem(LS_TICK, JSON.stringify([...TICKED])); } catch (e) {} }
+const taskKey = t => t.id || (t.what || "").slice(0, 60);
+const isTicked = t => TICKED.has(taskKey(t));
+function toggleTick(t) { const k = taskKey(t); TICKED.has(k) ? TICKED.delete(k) : TICKED.add(k); saveTicks(); }
 
 let DATA = null, ME = null, TAB = "now", FILTER = "mine", QUERY = "", CALDAY = null, WHO = undefined;
 
@@ -104,6 +113,15 @@ function ownedBy(t, who) {
 const isDone = t => t.status === "accepted" || t.status === "cancelled";
 const isLive = t => !isDone(t);
 
+/* Which of the three lists a task belongs in. Your own tick always wins, so you
+   can close something out before an active gets round to acknowledging it. */
+function bucket(t) {
+  if (isTicked(t)) return "done";
+  if (t.status === "accepted" || t.status === "cancelled" || t.status === "submitted") return "done";
+  if (t.status === "unclear") return "unclear";
+  return "todo";
+}
+
 function banFor(name) {
   const ps = (DATA.pledge_status || []).find(p => p.name === name);
   if (!ps || !ps.bans) return null;
@@ -140,12 +158,22 @@ function matchQuery(t) {
 /* ---------- rendering: task card ---------- */
 function taskCard(t) {
   const due = parseDue(t.due), u = urgency(due);
-  const card = el("div", "card " + (u && isLive(t) ? u : "") + (ownedBy(t, ME) ? " mine" : "") + (isDone(t) ? " done" : ""));
+  const b = bucket(t);
+  const card = el("div", "card " + (u && b === "todo" ? u : "") + (ownedBy(t, ME) ? " mine" : "") + (b !== "todo" ? " done" : ""));
 
   const head = el("div", "t-head");
-  head.appendChild(el("div", "t-what", t.what));
+  const left = el("div", "t-left");
+  const tick = el("button", "tick" + (isTicked(t) ? " on" : ""));
+  tick.type = "button";
+  tick.setAttribute("aria-pressed", isTicked(t) ? "true" : "false");
+  tick.title = isTicked(t) ? "Mark as not done" : "Mark done (only on this device)";
+  tick.onclick = (ev) => { ev.stopPropagation(); toggleTick(t); render(true); };
+  left.appendChild(tick);
+  left.appendChild(el("div", "t-what", t.what));
+  head.appendChild(left);
   const dueBox = el("div", "t-due " + (isLive(t) ? u : "") + (due ? "" : " none"));
-  const rel = el("span", "rel", isDone(t) ? (t.status === "cancelled" ? "cancelled" : "done") : relTime(due));
+  const rel = el("span", "rel", isTicked(t) ? "ticked off"
+    : isDone(t) ? (t.status === "cancelled" ? "cancelled" : "done") : relTime(due));
   if (due) rel.dataset.due = t.due;
   dueBox.appendChild(rel);
   dueBox.appendChild(el("span", "abs", due ? absTime(due) : String(t.due_text || "")));
@@ -173,10 +201,14 @@ function taskCard(t) {
   }
   meta.appendChild(el("span", "chip from", "from " + (t.assigned_by_address || t.assigned_by)));
   if (t.proof && !/^none/i.test(t.proof)) meta.appendChild(el("span", "chip proof", t.proof));
+  const at2 = parseDue(t.assigned_at);
+  if (at2) meta.appendChild(el("span", "chip when", "set " + absTime(at2)));
   card.appendChild(meta);
 
   const more = el("div", "t-more");
   const add = (k, v, cls) => { if (!v) return; const d = el("div", cls); d.appendChild(el("b", null, k + " ")); d.appendChild(document.createTextNode(v)); more.appendChild(d); };
+  const at = parseDue(t.assigned_at);
+  add("Assigned:", at ? absTime(at) + " by " + (t.assigned_by || "") : (t.assigned_by ? "by " + t.assigned_by : null));
   add("Proof:", t.proof);
   add("Said:", t.due_text && due ? t.due_text : null);
   add("If late:", t.escalation, "esc");
@@ -204,12 +236,13 @@ function viewNow() {
 
   // one tab per person, plus Everyone. WHO undefined means "follow the name picker".
   const who = currentWho();
+  const todoAll = (DATA.tasks || []).filter(t => bucket(t) === "todo");
   const strip = el("div", "people");
   const allBtn = el("button", who === null ? "on" : "", "Everyone");
   allBtn.onclick = () => { WHO = null; render(); };
   strip.appendChild(allBtn);
   PLEDGES.forEach(p => {
-    const n = live.filter(t => ownedBy(t, p));
+    const n = todoAll.filter(t => ownedBy(t, p));
     const lateN = n.filter(t => { const d = parseDue(t.due); return d && d < now(); }).length;
     const b = el("button", (who === p ? "on " : "") + (p === ME ? "self" : ""));
     b.appendChild(document.createTextNode(p));
@@ -226,11 +259,11 @@ function viewNow() {
   v.appendChild(head);
 
   if (who) {
-    const wl = live.filter(t => ownedBy(t, who));
+    const wl = todoAll.filter(t => ownedBy(t, who));
     const wo = wl.filter(t => { const d = parseDue(t.due); return d && d < now(); });
     const ws = wl.filter(t => { const d = parseDue(t.due); return d && d >= now() && d - now() < 24 * 36e5; });
     const line = el("div", "tiny");
-    line.textContent = `${who}: ${wo.length} late · ${ws.length} due in 24h · ${wl.length} open total`;
+    line.textContent = `${who}: ${wo.length} late · ${ws.length} due in 24h · ${wl.length} still to do`;
     v.appendChild(line);
   }
 
@@ -243,35 +276,54 @@ function viewNow() {
 
 function fillList(box) {
   box.textContent = "";
-  const live = (DATA.tasks || []).filter(isLive);
   const who = currentWho();
-  let list = who ? live.filter(t => ownedBy(t, who)) : live;
-  list = sortTasks(list.filter(matchQuery));
-  if (!list.length) { box.appendChild(el("div", "empty", who ? `Nothing open for ${who}. Tap Everyone.` : "Nothing matches.")); return; }
+  const all = (DATA.tasks || []).filter(matchQuery).filter(t => !who || ownedBy(t, who));
 
+  const todo    = sortTasks(all.filter(t => bucket(t) === "todo"));
+  const unclear = sortTasks(all.filter(t => bucket(t) === "unclear"));
+  const done    = sortTasks(all.filter(t => bucket(t) === "done"));
+
+  if (!all.length) {
+    box.appendChild(el("div", "empty", who ? `Nothing for ${who}. Tap Everyone.` : "Nothing matches."));
+    return;
+  }
+
+  /* TO DO, split by how soon it bites */
+  const h = el("h2", null, "To do");
+  h.appendChild(el("small", null, String(todo.length)));
+  box.appendChild(h);
+  if (!todo.length) box.appendChild(el("div", "empty", "Nothing outstanding. Rare."));
   const buckets = [
     ["Late", t => { const d = parseDue(t.due); return d && d < now(); }],
     ["Next 24 hours", t => { const d = parseDue(t.due); return d && d >= now() && d - now() < 24 * 36e5; }],
     ["Later", t => { const d = parseDue(t.due); return d && d - now() >= 24 * 36e5; }],
-    ["No deadline given", t => !parseDue(t.due)],
+    ["No deadline given", () => true],
   ];
   const used = new Set();
   buckets.forEach(([name, test]) => {
-    const group = list.filter(t => !used.has(t) && test(t));
-    group.forEach(t => used.add(t));
-    if (!group.length) return;
-    const h = el("h2", null, name); h.appendChild(el("small", null, String(group.length)));
-    box.appendChild(h);
-    group.forEach(t => box.appendChild(taskCard(t)));
+    const g = todo.filter(t => !used.has(t) && test(t));
+    g.forEach(t => used.add(t));
+    if (!g.length) return;
+    const sub = el("h3", "sub"); sub.textContent = name;
+    sub.appendChild(el("small", null, String(g.length)));
+    box.appendChild(sub);
+    g.forEach(t => box.appendChild(taskCard(t)));
   });
 
-  const done = sortTasks((DATA.tasks || []).filter(isDone).filter(matchQuery)
-    .filter(t => !who || ownedBy(t, who)));
-  if (done.length) {
-    const h = el("h2", null, "Closed"); h.appendChild(el("small", null, String(done.length)));
-    box.appendChild(h);
-    done.slice(0, 40).forEach(t => box.appendChild(taskCard(t)));
+  if (unclear.length) {
+    const h2 = el("h2", null, "Unclear");
+    h2.appendChild(el("small", null, String(unclear.length)));
+    box.appendChild(h2);
+    box.appendChild(el("div", "tiny", "Nobody could tell from the thread whether these were finished or what exactly was asked. Check before assuming you are safe."));
+    unclear.forEach(t => box.appendChild(taskCard(t)));
   }
+
+  const h3 = el("h2", null, "Done");
+  h3.appendChild(el("small", null, String(done.length)));
+  box.appendChild(h3);
+  if (!done.length) box.appendChild(el("div", "empty", "Nothing closed out yet."));
+  done.slice(0, 80).forEach(t => box.appendChild(taskCard(t)));
+  if (done.length > 80) box.appendChild(el("div", "tiny", `${done.length - 80} more not shown.`));
 }
 
 function viewBoard() {
