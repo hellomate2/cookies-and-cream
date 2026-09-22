@@ -29,6 +29,30 @@ async function decrypt(bundle, passphrase) {
 /* ---------- time ---------- */
 const now = () => new Date();
 
+/* Every time in this data is Pacific. A pledge in New York must still see the
+   Berkeley clock, so derive day-of-week and minutes in America/Los_Angeles. */
+const PT = "America/Los_Angeles";
+function ptNow() {
+  let p;
+  try {
+    p = new Intl.DateTimeFormat("en-US", {
+      timeZone: PT, weekday: "short", hour: "2-digit", minute: "2-digit",
+      hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(now()).reduce((o, x) => (o[x.type] = x.value, o), {});
+  } catch (e) {
+    const d = now();
+    return { day: d.getDay() === 0 ? 7 : d.getDay(), mins: d.getHours() * 60 + d.getMinutes(),
+             ymd: d.toISOString().slice(0, 10), label: d.toLocaleString() };
+  }
+  const wd = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[p.weekday] || 1;
+  return {
+    day: wd,
+    mins: (Number(p.hour) % 24) * 60 + Number(p.minute),
+    ymd: `${p.year}-${p.month}-${p.day}`,
+    label: now().toLocaleString([], { timeZone: PT, weekday: "long", hour: "numeric", minute: "2-digit" }),
+  };
+}
+
 function parseDue(s) { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d; }
 
 function relTime(d, ref) {
@@ -65,6 +89,8 @@ function fmtHM(str) { const [h, m] = str.split(":").map(Number); const ap = h < 
 function assignedTo(t) {
   const a = t.assigned_to || [];
   if (a.includes("ALL")) return PLEDGES.slice();
+  if (a.includes("UNBANNED")) return PLEDGES.filter(p => !isBanned(p));
+  if (a.includes("ANY_ONE") || a.includes("ANY_TWO")) return PLEDGES.slice();
   return a.filter(x => PLEDGES.includes(x));
 }
 function isGroup(t) { const a = t.assigned_to || []; return a.includes("ALL") || a.includes("ANY_ONE") || a.includes("ANY_TWO") || a.includes("UNBANNED"); }
@@ -139,9 +165,12 @@ function taskCard(t) {
   const chip = el("span", "chip" + (ownedBy(t, ME) ? " me" : ""), label);
   meta.appendChild(chip);
   if (isGroup(t) && Array.isArray(t.done_by) && t.done_by.length) {
-    const owed = assignedTo(t).filter(p => !t.done_by.includes(p));
-    meta.appendChild(el("span", "chip done-by", `${t.done_by.length} in`));
-    if (owed.length) meta.appendChild(el("span", "chip owing", "still owed: " + owed.join(", ")));
+    const need = who.includes("ANY_TWO") ? 2 : who.includes("ANY_ONE") ? 1 : assignedTo(t).length;
+    meta.appendChild(el("span", "chip done-by", `${t.done_by.length} of ${need} in`));
+    if (t.done_by.length < need) {
+      const owed = assignedTo(t).filter(p => !t.done_by.includes(p));
+      if (owed.length && owed.length <= 6) meta.appendChild(el("span", "chip owing", "still owed: " + owed.join(", ")));
+    }
   }
   meta.appendChild(el("span", "chip from", "from " + (t.assigned_by_address || t.assigned_by)));
   if (t.proof && !/^none/i.test(t.proof)) meta.appendChild(el("span", "chip proof", t.proof));
@@ -381,14 +410,14 @@ function viewActives() {
 function viewCal() {
   const v = el("div");
   const cal = DATA.calendar || { schedule: [], exams: [] };
-  const t = now(), today = t.getDay() === 0 ? 7 : t.getDay(), mins = t.getHours() * 60 + t.getMinutes();
+  const t = now(), pt = ptNow(), today = pt.day, mins = pt.mins;
   if (CALDAY == null) CALDAY = today;
 
   /* right now */
   const box = el("div", "now-box");
   const hdr = el("div", "hdr");
   hdr.appendChild(el("b", null, "Right now"));
-  hdr.appendChild(el("span", "clock", t.toLocaleString([], { weekday: "long", hour: "numeric", minute: "2-digit" })));
+  hdr.appendChild(el("span", "clock", pt.label + " Berkeley time"));
   box.appendChild(hdr);
 
   const busyNow = {}, awayNow = {};
@@ -414,15 +443,15 @@ function viewCal() {
   v.appendChild(box);
 
   /* exams */
-  const upcoming = (cal.exams || []).map(e => ({ ...e, d: parseDue(e.date + "T23:59") }))
-    .filter(e => e.d && e.d >= new Date(t.getFullYear(), t.getMonth(), t.getDate()))
+  const upcoming = (cal.exams || []).map(e => ({ ...e, d: parseDue(e.date + "T23:59:00-07:00") }))
+    .filter(e => e.date >= pt.ymd)
     .sort((a, b) => a.d - b.d);
   if (upcoming.length) {
     v.appendChild(el("h2", null, "Exams coming up"));
     upcoming.forEach(e => {
       const d = el("div", "exam");
       d.appendChild(el("b", null, e.who.join(", ")));
-      d.appendChild(document.createTextNode(` — ${e.what}, ${new Date(e.date + "T12:00").toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}${e.time ? ", " + e.time : ""}`));
+      d.appendChild(document.createTextNode(` — ${e.what}, ${new Date(e.date + "T12:00:00-07:00").toLocaleDateString([], { timeZone: PT, weekday: "long", month: "short", day: "numeric" })}${e.time ? ", " + e.time : ""}`));
       v.appendChild(d);
     });
     v.appendChild(el("div", "warn", "Do not hand these guys a task during someone's midterm. Check here first."));
@@ -431,7 +460,7 @@ function viewCal() {
   /* dated commitments pulled out of the threads */
   const evs = (DATA.events || []).map(e => ({ ...e, d: parseDue(e.when) }))
     .sort((a, b) => (a.d ? a.d.getTime() : 8e15) - (b.d ? b.d.getTime() : 8e15));
-  const future = evs.filter(e => !e.d || e.d >= new Date(t.getFullYear(), t.getMonth(), t.getDate()));
+  const future = evs.filter(e => !e.d || e.d >= parseDue(pt.ymd + "T00:00:00-07:00"));
   if (future.length) {
     const h = el("h2", null, "Commitments"); h.appendChild(el("small", null, String(future.length)));
     v.appendChild(h);
@@ -547,14 +576,14 @@ function updateBanner() {
 }
 
 /* ---------- shell ---------- */
-function render() {
+function render(keepScroll) {
   const v = $("#view");
   v.textContent = "";
   const views = { now: viewNow, board: viewBoard, rules: viewRules, actives: viewActives, cal: viewCal, threads: viewThreads };
   v.appendChild((views[TAB] || viewNow)());
   [...$("#tabs").children].forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
   updateBanner();
-  window.scrollTo(0, 0);
+  if (!keepScroll) window.scrollTo(0, 0);
 }
 
 function tickClocks() {
@@ -608,7 +637,15 @@ async function refresh() {
     const b = await r.json();
     if (DATA && b.generated_at === DATA.generated_at) { syncLabel(); return; }
     setData(await decrypt(b, PASS));
-    render(); syncLabel();
+    const open = [...document.querySelectorAll(".card.open")].map(c => c.textContent.slice(0, 60));
+    const y = window.scrollY;
+    render(true);
+    // put back the cards the reader had expanded, and their place on the page
+    document.querySelectorAll(".card").forEach(c => {
+      if (open.some(o => c.textContent.slice(0, 60) === o)) c.classList.add("open");
+    });
+    window.scrollTo(0, y);
+    syncLabel();
   } catch (e) { /* offline is fine, keep showing what we have */ }
 }
 

@@ -15,7 +15,8 @@
   <form id="gateForm" class="gate-card" autocomplete="off">
     <div class="gate-title">Cookies and Cream</div>
     <div class="gate-sub">Alpha Theta. Passphrase to open.</div>
-    <input id="gatePass" type="password" inputmode="text" placeholder="passphrase" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label for="gatePass" class="sr-only">Passphrase</label>
+    <input id="gatePass" type="password" inputmode="text" placeholder="passphrase" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="current-password">
     <button type="submit">Open</button>
     <div id="gateErr" class="gate-err"></div>
   </form>
@@ -27,16 +28,15 @@
     <span class="brand-name">Cookies and Cream</span>
   </div>
   <div class="top-right">
-    <select id="me" title="Who are you"></select>
+    <label for="me" class="sr-only">Who are you</label>
+    <select id="me" title="Who are you" aria-label="Who are you"></select>
     <span id="sync" class="sync" title="Last sync">…</span>
   </div>
 </header>
 
-<div id="banner" class="banner" hidden></div>
+<div id="banner" class="banner" role="status" aria-live="polite" hidden></div>
 
-<main id="view"></main>
-
-<nav class="tabs" id="tabs">
+<nav class="tabs" id="tabs" aria-label="Sections">
   <button data-tab="now" class="on">Now</button>
   <button data-tab="board">Board</button>
   <button data-tab="rules">Rules</button>
@@ -44,6 +44,9 @@
   <button data-tab="cal">Calendar</button>
   <button data-tab="threads">Threads</button>
 </nav>
+
+<main id="view" tabindex="-1"></main>
+
 
 <script src="app.js"></script>
 </body>
