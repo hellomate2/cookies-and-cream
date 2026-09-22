@@ -5,3 +5,6 @@ sync/passphrase.txt
 sync/state.json
 __pycache__/
 .DS_Store
+
+# operator notes stay local
+OPERATIONS.md
