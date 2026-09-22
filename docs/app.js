@@ -207,6 +207,46 @@ function matchQuery(t) {
     .some(v => v && String(v).toLowerCase().includes(q));
 }
 
+/* ---------- punishments that grow while you read this ---------- */
+function punishNow(x, at) {
+  if (x.cleared || x.base == null) return null;
+  const since = parseDue(x.since);
+  if (!since) return x.base;
+  const mins = Math.max(0, ((at || now()) - since) / 6e4);
+  if (x.doubles_every_hours) return Math.round(x.base * Math.pow(2, mins / 60 / x.doubles_every_hours));
+  const perMin = (Number(x.rate_per_minute) || 0) + (Number(x.rate_per_hour) || 0) / 60;
+  const v = Math.floor(x.base + perMin * mins);
+  return x.cap != null ? Math.min(v, x.cap) : v;
+}
+const punishGrows = x => !x.cleared &&
+  (Number(x.rate_per_minute) || Number(x.rate_per_hour) || x.doubles_every_hours);
+
+function punishmentsFor(who) {
+  return (DATA.punishments || []).filter(x => x.name === who && !x.cleared);
+}
+
+function punishRow(x) {
+  const row = el("div", "pun" + (punishGrows(x) ? " growing" : ""));
+  const v = punishNow(x);
+  const head = el("div", "pun-h");
+  head.appendChild(el("span", "pun-w", x.what || "punishment"));
+  if (v != null) {
+    const n = el("span", "pun-n");
+    n.textContent = String(v);
+    if (punishGrows(x)) { n.dataset.pun = JSON.stringify({ base: x.base, since: x.since, rpm: x.rate_per_minute || 0, rph: x.rate_per_hour || 0, dbl: x.doubles_every_hours || 0, cap: x.cap }); }
+    head.appendChild(n);
+  }
+  row.appendChild(head);
+  const sub = el("div", "pun-s");
+  const rate = x.rate_per_minute ? `growing by ${x.rate_per_minute} a minute`
+    : x.rate_per_hour ? `growing by ${x.rate_per_hour} an hour`
+    : x.doubles_every_hours ? `doubling every ${x.doubles_every_hours}h` : "not growing";
+  sub.textContent = (x.set_by ? x.set_by + " · " : "") + rate;
+  row.appendChild(sub);
+  if (x.note) row.appendChild(el("div", "pun-note", x.note));
+  return row;
+}
+
 /* ---------- rendering: task card ---------- */
 function taskCard(t) {
   const due = parseDue(t.due), u = urgency(due);
@@ -350,6 +390,15 @@ function viewNow() {
     }
   }
 
+  const puns = who ? punishmentsFor(who) : [];
+  const growing = puns.filter(punishGrows);
+  if (growing.length) {
+    const box = el("div", "punbar");
+    box.appendChild(el("div", "punbar-k", `Counting up right now`));
+    growing.forEach(x => box.appendChild(punishRow(x)));
+    v.appendChild(box);
+  }
+
   // replies already written and sitting in Gmail waiting to be checked and sent
   const drafts = DATA.drafts || [];
   if (who === ME && drafts.length) {
@@ -479,9 +528,17 @@ function viewBoard() {
       b.appendChild(document.createTextNode(`${sc} ${u} (${ban.by}${ban.reason ? ", " + ban.reason : ""})`));
       c.appendChild(b);
     }
-    (ps.running_punishments || []).forEach(p => {
-      const d = el("div", "p-line"); d.appendChild(el("b", null, "Running: ")); d.appendChild(document.createTextNode(p)); c.appendChild(d);
-    });
+    const mine2 = punishmentsFor(name);
+    if (mine2.length) {
+      const wrap = el("div", "p-puns");
+      mine2.slice(0, 6).forEach(x => wrap.appendChild(punishRow(x)));
+      if (mine2.length > 6) wrap.appendChild(el("div", "tiny", `+${mine2.length - 6} more`));
+      c.appendChild(wrap);
+    } else {
+      (ps.running_punishments || []).slice(0, 4).forEach(pp => {
+        const d = el("div", "p-line"); d.appendChild(el("b", null, "Running: ")); d.appendChild(document.createTextNode(pp)); c.appendChild(d);
+      });
+    }
     if (ps.heat) { const d = el("div", "p-line"); d.appendChild(el("b", null, "Heat: ")); d.appendChild(document.createTextNode(ps.heat)); c.appendChild(d); }
     if (ps.praise) { const d = el("div", "p-line"); d.appendChild(el("b", null, "Praise: ")); d.appendChild(document.createTextNode(ps.praise)); c.appendChild(d); }
 
@@ -781,6 +838,11 @@ function render(keepScroll) {
 }
 
 function tickClocks() {
+  document.querySelectorAll(".pun-n[data-pun]").forEach(n => {
+    let x; try { x = JSON.parse(n.dataset.pun); } catch (e) { return; }
+    const v = punishNow({ base: x.base, since: x.since, rate_per_minute: x.rpm, rate_per_hour: x.rph, doubles_every_hours: x.dbl, cap: x.cap });
+    if (v != null) n.textContent = String(v);
+  });
   document.querySelectorAll(".rel[data-due]").forEach(n => {
     const d = parseDue(n.dataset.due);
     n.textContent = relTime(d);
