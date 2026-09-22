@@ -5,9 +5,10 @@ let PLEDGES = [];   // filled from the decrypted payload; never hardcoded, this 
 const DAYNAME = ["","Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const LS_ME = "cc.me", LS_PASS = "cc.pass", LS_TAB = "cc.tab", LS_DAY = "cc.day";
 
-let DATA = null, ME = null, TAB = "now", FILTER = "mine", QUERY = "", CALDAY = null;
+let DATA = null, ME = null, TAB = "now", FILTER = "mine", QUERY = "", CALDAY = null, WHO = undefined;
 
 function setData(d) { DATA = d; PLEDGES = (d && d.pledges) || []; }
+function currentWho() { return WHO === undefined ? (ME || null) : WHO; }
 const $ = (s, r = document) => r.querySelector(s);
 const el = (t, c, txt) => { const n = document.createElement(t); if (c) n.className = c; if (txt != null) n.textContent = txt; return n; };
 const esc = s => String(s == null ? "" : s);
@@ -173,22 +174,35 @@ function viewNow() {
   const overdue = mine.filter(t => { const d = parseDue(t.due); return d && d < now(); });
   const soon = mine.filter(t => { const d = parseDue(t.due); return d && d >= now() && d - now() < 24 * 36e5; });
 
-  const head = el("div", "row");
-  const seg = el("div", "seg");
-  [["mine", "Mine"], ["all", "Everyone"]].forEach(([k, lbl]) => {
-    const b = el("button", FILTER === k ? "on" : "", lbl);
-    b.onclick = () => { FILTER = k; render(); };
-    seg.appendChild(b);
+  // one tab per person, plus Everyone. WHO undefined means "follow the name picker".
+  const who = currentWho();
+  const strip = el("div", "people");
+  const allBtn = el("button", who === null ? "on" : "", "Everyone");
+  allBtn.onclick = () => { WHO = null; render(); };
+  strip.appendChild(allBtn);
+  PLEDGES.forEach(p => {
+    const n = live.filter(t => ownedBy(t, p));
+    const lateN = n.filter(t => { const d = parseDue(t.due); return d && d < now(); }).length;
+    const b = el("button", (who === p ? "on " : "") + (p === ME ? "self" : ""));
+    b.appendChild(document.createTextNode(p));
+    if (n.length) b.appendChild(el("span", "n" + (lateN ? " bad" : ""), String(lateN || n.length)));
+    b.onclick = () => { WHO = p; render(); };
+    strip.appendChild(b);
   });
-  head.appendChild(seg);
+  v.appendChild(strip);
+
+  const head = el("div", "row");
   const s = el("input", "search"); s.placeholder = "search tasks"; s.value = QUERY;
   s.oninput = e => { QUERY = e.target.value; const box = $("#taskList"); if (box) fillList(box); };
   head.appendChild(s);
   v.appendChild(head);
 
-  if (ME) {
+  if (who) {
+    const wl = live.filter(t => ownedBy(t, who));
+    const wo = wl.filter(t => { const d = parseDue(t.due); return d && d < now(); });
+    const ws = wl.filter(t => { const d = parseDue(t.due); return d && d >= now() && d - now() < 24 * 36e5; });
     const line = el("div", "tiny");
-    line.textContent = `${overdue.length} late · ${soon.length} due in 24h · ${mine.length} open total`;
+    line.textContent = `${who}: ${wo.length} late · ${ws.length} due in 24h · ${wl.length} open total`;
     v.appendChild(line);
   }
 
@@ -202,9 +216,10 @@ function viewNow() {
 function fillList(box) {
   box.textContent = "";
   const live = (DATA.tasks || []).filter(isLive);
-  let list = FILTER === "mine" && ME ? live.filter(t => ownedBy(t, ME)) : live;
+  const who = currentWho();
+  let list = who ? live.filter(t => ownedBy(t, who)) : live;
   list = sortTasks(list.filter(matchQuery));
-  if (!list.length) { box.appendChild(el("div", "empty", FILTER === "mine" && ME ? "Nothing open for you. Check Everyone." : "Nothing matches.")); return; }
+  if (!list.length) { box.appendChild(el("div", "empty", who ? `Nothing open for ${who}. Tap Everyone.` : "Nothing matches.")); return; }
 
   const buckets = [
     ["Late", t => { const d = parseDue(t.due); return d && d < now(); }],
@@ -223,7 +238,7 @@ function fillList(box) {
   });
 
   const done = sortTasks((DATA.tasks || []).filter(isDone).filter(matchQuery)
-    .filter(t => FILTER !== "mine" || !ME || ownedBy(t, ME)));
+    .filter(t => !who || ownedBy(t, who)));
   if (done.length) {
     const h = el("h2", null, "Closed"); h.appendChild(el("small", null, String(done.length)));
     box.appendChild(h);
@@ -274,6 +289,7 @@ function viewBoard() {
       if (mine.length > 8) ul.appendChild(el("li", "tiny", `+${mine.length - 8} more`));
       c.appendChild(ul);
     }
+    c.onclick = () => { WHO = name; TAB = "now"; render(); };
     grid.appendChild(c);
   });
   v.appendChild(grid);
@@ -571,7 +587,7 @@ function boot(data) {
   PLEDGES.forEach(p => { const o = el("option", null, p); o.value = p; sel.appendChild(o); });
   try { ME = localStorage.getItem(LS_ME) || ""; } catch (e) { ME = ""; }
   sel.value = ME || "";
-  sel.onchange = () => { ME = sel.value; try { localStorage.setItem(LS_ME, ME); } catch (e) {} render(); };
+  sel.onchange = () => { ME = sel.value; WHO = undefined; try { localStorage.setItem(LS_ME, ME); } catch (e) {} render(); };
 
   [...$("#tabs").children].forEach(b => b.onclick = () => { TAB = b.dataset.tab; QUERY = ""; try { localStorage.setItem(LS_TAB, TAB); } catch (e) {} render(); });
   try { TAB = localStorage.getItem(LS_TAB) || "now"; CALDAY = +localStorage.getItem(LS_DAY) || null; } catch (e) {}

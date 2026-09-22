@@ -84,6 +84,19 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
   .tabs button { font-size: .9rem; }
 }
 
+/* per-person strip */
+.people { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 6px; margin: 0 calc(var(--gap) * -1); padding-left: var(--gap); padding-right: var(--gap); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.people::-webkit-scrollbar { display: none; }
+.people button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; color: var(--fg2); font-weight: 600; font-size: .88rem; min-height: 36px; }
+.people button.on { background: var(--acc); color: #000; border-color: var(--acc); }
+.people button.self { border-color: #4a5566; }
+.people button.self::before { content: "\2605"; font-size: .7em; color: var(--yel); }
+.people button.on.self::before { color: #7a6a00; }
+.people button .n { background: var(--bg3); color: var(--fg2); border-radius: 999px; padding: 0 6px; font-size: .74rem; min-width: 18px; text-align: center; }
+.people button .n.bad { background: var(--red-bg); color: var(--red); }
+.people button.on .n { background: rgba(0,0,0,.14); color: #000; }
+.people button.on .n.bad { background: #7a1c20; color: #fff; }
+
 /* controls row */
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
 .seg { display: inline-flex; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
@@ -134,7 +147,8 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 960px) { .grid.three { grid-template-columns: 1fr 1fr 1fr; } }
-.p-card { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
+.p-card { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; cursor: pointer; }
+.p-card:hover { border-color: #3a4452; }
 .p-card.mine { box-shadow: inset 3px 0 0 var(--acc); }
 .p-card.banned { border-color: #5a2328; }
 .p-head { display: flex; justify-content: space-between; align-items: baseline; }
