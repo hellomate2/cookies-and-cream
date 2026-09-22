@@ -209,6 +209,10 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .a-addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; color: var(--blu); white-space: nowrap; }
 .a-sub { grid-column: 1 / -1; font-size: .82rem; color: var(--fg3); }
 .a-cares { grid-column: 1 / -1; font-size: .88rem; color: var(--fg2); }
+.a-demands { grid-column: 1 / -1; font-size: .82rem; color: var(--fg2); margin-top: 3px; }
+.a-demands b { color: var(--org); font-weight: 600; }
+.a-quote { grid-column: 1 / -1; font-size: .84rem; color: var(--fg3); font-style: italic; margin-top: 3px; }
+.a-sub .quiet { color: var(--fg3); font-style: italic; }
 .a-role { color: var(--yel); font-weight: 600; }
 
 /* calendar */

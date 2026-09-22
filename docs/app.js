@@ -545,8 +545,21 @@ function viewActives() {
       if (a.role) { n.appendChild(document.createTextNode(" ")); n.appendChild(el("span", "a-role", a.role)); }
       r.appendChild(n);
       r.appendChild(el("div", "a-addr", a.address_as || ""));
-      if (a.major) r.appendChild(el("div", "a-sub", a.major));
+      const sub = el("div", "a-sub");
+      sub.textContent = a.major || "";
+      if (a.posts === false) {
+        sub.appendChild(document.createTextNode(a.major ? " · " : ""));
+        sub.appendChild(el("span", "quiet", "never posts on the listserv"));
+      }
+      r.appendChild(sub);
       if (a.cares_about) r.appendChild(el("div", "a-cares", a.cares_about));
+      if (a.expects || a.proof_format) {
+        const d2 = el("div", "a-demands");
+        if (a.expects) { d2.appendChild(el("b", null, "Wants a reply: ")); d2.appendChild(document.createTextNode(a.expects + "  ")); }
+        if (a.proof_format) { d2.appendChild(el("b", null, "Proof: ")); d2.appendChild(document.createTextNode(a.proof_format)); }
+        r.appendChild(d2);
+      }
+      if (a.quote) r.appendChild(el("div", "a-quote", "\u201c" + a.quote + "\u201d"));
       v.appendChild(r);
     });
   });
