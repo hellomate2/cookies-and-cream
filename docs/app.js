@@ -122,6 +122,14 @@ function bucket(t) {
   return "todo";
 }
 
+/* Per person. A class-wide task you have already turned in is done for YOU even
+   though it stays open for whoever has not sent theirs. */
+function bucketFor(t, who) {
+  if (who && Array.isArray(t.done_by) && t.done_by.includes(who)) return "done";
+  return bucket(t);
+}
+function turnedIn(t, who) { return !!(who && Array.isArray(t.done_by) && t.done_by.includes(who)); }
+
 function banFor(name) {
   const ps = (DATA.pledge_status || []).find(p => p.name === name);
   if (!ps || !ps.bans) return null;
@@ -158,7 +166,7 @@ function matchQuery(t) {
 /* ---------- rendering: task card ---------- */
 function taskCard(t) {
   const due = parseDue(t.due), u = urgency(due);
-  const b = bucket(t);
+  const b = bucketFor(t, currentWho());
   const card = el("div", "card " + (u && b === "todo" ? u : "") + (ownedBy(t, ME) ? " mine" : "") + (b !== "todo" ? " done" : ""));
 
   const head = el("div", "t-head");
@@ -172,7 +180,9 @@ function taskCard(t) {
   left.appendChild(el("div", "t-what", t.what));
   head.appendChild(left);
   const dueBox = el("div", "t-due " + (isLive(t) ? u : "") + (due ? "" : " none"));
+  const meWho = currentWho();
   const rel = el("span", "rel", isTicked(t) ? "ticked off"
+    : turnedIn(t, meWho) ? "you turned it in"
     : isDone(t) ? (t.status === "cancelled" ? "cancelled" : "done") : relTime(due));
   if (due) rel.dataset.due = t.due;
   dueBox.appendChild(rel);
@@ -236,13 +246,13 @@ function viewNow() {
 
   // one tab per person, plus Everyone. WHO undefined means "follow the name picker".
   const who = currentWho();
-  const todoAll = (DATA.tasks || []).filter(t => bucket(t) === "todo");
+  const todoAll = (DATA.tasks || []).filter(t => bucket(t) === "todo");   // class-wide view
   const strip = el("div", "people");
   const allBtn = el("button", who === null ? "on" : "", "Everyone");
   allBtn.onclick = () => { WHO = null; render(); };
   strip.appendChild(allBtn);
   PLEDGES.forEach(p => {
-    const n = todoAll.filter(t => ownedBy(t, p));
+    const n = (DATA.tasks || []).filter(t => ownedBy(t, p) && bucketFor(t, p) === "todo");
     const lateN = n.filter(t => { const d = parseDue(t.due); return d && d < now(); }).length;
     const b = el("button", (who === p ? "on " : "") + (p === ME ? "self" : ""));
     b.appendChild(document.createTextNode(p));
@@ -259,7 +269,7 @@ function viewNow() {
   v.appendChild(head);
 
   if (who) {
-    const wl = todoAll.filter(t => ownedBy(t, who));
+    const wl = (DATA.tasks || []).filter(t => ownedBy(t, who) && bucketFor(t, who) === "todo");
     const wo = wl.filter(t => { const d = parseDue(t.due); return d && d < now(); });
     const ws = wl.filter(t => { const d = parseDue(t.due); return d && d >= now() && d - now() < 24 * 36e5; });
     const line = el("div", "tiny");
@@ -279,9 +289,9 @@ function fillList(box) {
   const who = currentWho();
   const all = (DATA.tasks || []).filter(matchQuery).filter(t => !who || ownedBy(t, who));
 
-  const todo    = sortTasks(all.filter(t => bucket(t) === "todo"));
-  const unclear = sortTasks(all.filter(t => bucket(t) === "unclear"));
-  const done    = sortTasks(all.filter(t => bucket(t) === "done"));
+  const todo    = sortTasks(all.filter(t => bucketFor(t, who) === "todo"));
+  const unclear = sortTasks(all.filter(t => bucketFor(t, who) === "unclear"));
+  const done    = sortTasks(all.filter(t => bucketFor(t, who) === "done"));
 
   if (!all.length) {
     box.appendChild(el("div", "empty", who ? `Nothing for ${who}. Tap Everyone.` : "Nothing matches."));
@@ -328,16 +338,15 @@ function fillList(box) {
 
 function viewBoard() {
   const v = el("div");
-  const todoAll = (DATA.tasks || []).filter(t => bucket(t) === "todo");
-  const unclearAll = (DATA.tasks || []).filter(t => bucket(t) === "unclear");
+  const allTasks = DATA.tasks || [];
   const grid = el("div", "grid three");
 
   PLEDGES.forEach(name => {
     const ps = (DATA.pledge_status || []).find(p => p.name === name) || {};
     const ban = banFor(name);
-    const mine = sortTasks(todoAll.filter(t => ownedBy(t, name)));
+    const mine = sortTasks(allTasks.filter(t => ownedBy(t, name) && bucketFor(t, name) === "todo"));
     const late = mine.filter(t => { const d = parseDue(t.due); return d && d < now(); });
-    const murky = unclearAll.filter(t => ownedBy(t, name)).length;
+    const murky = allTasks.filter(t => ownedBy(t, name) && bucketFor(t, name) === "unclear").length;
 
     const c = el("div", "p-card" + (name === ME ? " mine" : "") + (ban ? " banned" : ""));
     const h = el("div", "p-head");
