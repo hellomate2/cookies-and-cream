@@ -145,6 +145,7 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .chip { display: inline-block; font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bg3); color: var(--fg2); border: 1px solid var(--line); }
 .chip.me { background: var(--acc); color: #000; border-color: var(--acc); }
 .chip.from { background: transparent; }
+.chip.clash { background: var(--org-bg); color: var(--org); border-color: #4a3a18; }
 .chip.when { background: transparent; color: var(--fg3); }
 .chip.proof { background: var(--blu-bg); color: var(--blu); border-color: #1d3a55; }
 .chip.done-by { background: var(--grn-bg); color: var(--grn); border-color: #1f4a2e; }

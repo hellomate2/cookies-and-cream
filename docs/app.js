@@ -93,6 +93,28 @@ const urgency = d => { if (!d) return "none"; const ms = d - now(); return ms < 
 function hm(str) { const [h, m] = str.split(":").map(Number); return h * 60 + m; }
 function fmtHM(str) { const [h, m] = str.split(":").map(Number); const ap = h < 12 ? "am" : "pm"; const hh = h % 12 || 12; return m ? `${hh}:${String(m).padStart(2,"0")}${ap}` : `${hh}${ap}`; }
 
+/* A deadline that lands while you are in a lecture, on a plane, or at the
+   Thursday meeting is a deadline you will miss. Say so on the card. */
+function clashFor(t, who) {
+  const d = parseDue(t.due);
+  if (!d || !who) return null;
+  for (const a of (DATA.away || [])) {
+    if (a.who !== who) continue;
+    const f = parseDue(a.from), u = parseDue(a.until);
+    if (f && u && d >= f && d < u) return a.what || "away";
+  }
+  const cal = (DATA.calendar || {}).schedule || [];
+  let p;
+  try {
+    p = new Intl.DateTimeFormat("en-US", { timeZone: PT, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(d).reduce((o, x) => (o[x.type] = x.value, o), {});
+  } catch (e) { return null; }
+  const day = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[p.weekday];
+  const mins = (Number(p.hour) % 24) * 60 + Number(p.minute);
+  const hit = cal.find(x => x.day === day && x.who.includes(who) && mins >= hm(x.start) && mins < hm(x.end));
+  return hit ? hit.what : null;
+}
+
 /* ---------- task helpers ---------- */
 function assignedTo(t) {
   const a = t.assigned_to || [];
@@ -215,6 +237,8 @@ function taskCard(t) {
   if (t.proof && !/^none/i.test(t.proof)) meta.appendChild(el("span", "chip proof", t.proof));
   const at2 = parseDue(t.assigned_at);
   if (at2) meta.appendChild(el("span", "chip when", "set " + absTime(at2)));
+  const clash = b === "todo" ? clashFor(t, meWho) : null;
+  if (clash) meta.appendChild(el("span", "chip clash", "due while you are in " + clash));
   card.appendChild(meta);
 
   const more = el("div", "t-more");
