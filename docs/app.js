@@ -802,3 +802,11 @@ $("#gateForm").onsubmit = e => { e.preventDefault(); tryOpen($("#gatePass").valu
   try { saved = localStorage.getItem(LS_PASS); } catch (e) {}
   if (saved) tryOpen(saved, true);
 })();
+
+/* Register the offline shell. Failure here is never fatal: the page works
+   online regardless, so a refusal in private mode changes nothing. */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
