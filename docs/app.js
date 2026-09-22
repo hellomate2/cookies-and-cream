@@ -192,6 +192,8 @@ function taskCard(t) {
 
   const meta = el("div", "t-meta");
   meta.appendChild(el("span", "pill " + t.status, t.status));
+  if (t.status === "accepted" && t.confirmed === false)
+    meta.appendChild(el("span", "pill unconfirmed", "no active confirmed"));
   if (t.priority === "critical" && isLive(t)) meta.appendChild(el("span", "pill critical", "critical"));
   const who = t.assigned_to || [];
   const label = who.includes("ALL") ? "whole PC"
@@ -225,6 +227,14 @@ function taskCard(t) {
   add("Status:", t.status_evidence);
   add("Notes:", t.notes);
   add("Thread:", t.thread_subject);
+  if (t.thread_id) {
+    const row = el("div");
+    const a = el("a", "openmail", "Open this email in Gmail");
+    a.href = "https://mail.google.com/mail/u/0/#all/" + t.thread_id;
+    a.target = "_blank"; a.rel = "noopener";
+    row.appendChild(a);
+    more.appendChild(row);
+  }
   card.appendChild(more);
 
   if (more.children.length) {
@@ -261,6 +271,45 @@ function viewNow() {
     strip.appendChild(b);
   });
   v.appendChild(strip);
+
+  // the one thing to do next, with a live countdown
+  if (who) {
+    const mineTodo = (DATA.tasks || []).filter(t => ownedBy(t, who) && bucketFor(t, who) === "todo");
+    const dated = mineTodo.filter(t => parseDue(t.due)).sort((a, b) => parseDue(a.due) - parseDue(b.due));
+    const nextUp = dated.find(t => parseDue(t.due) >= now());
+    const oldest = dated.find(t => parseDue(t.due) < now());
+    const pick = oldest || nextUp;
+    if (pick) {
+      const box = el("div", "upnext" + (oldest ? " bad" : ""));
+      box.appendChild(el("div", "upnext-k", oldest ? "Most overdue" : "Up next"));
+      box.appendChild(el("div", "upnext-w", pick.what));
+      const cd = el("div", "upnext-t rel", relTime(parseDue(pick.due)));
+      cd.dataset.due = pick.due;
+      box.appendChild(cd);
+      const sub = el("div", "upnext-s");
+      sub.textContent = (pick.assigned_by_address || pick.assigned_by || "") +
+        (pick.proof && !/^none/i.test(pick.proof) ? " · needs " + pick.proof : "");
+      box.appendChild(sub);
+      box.onclick = () => { TAB = "now"; QUERY = pick.what.slice(0, 28); render(); };
+      v.appendChild(box);
+    }
+  }
+
+  // anything with a date and a place, so nobody misses a physical event
+  const soonEvents = (DATA.events || [])
+    .map(e => ({ ...e, d: parseDue(e.when) }))
+    .filter(e => e.d && e.d >= now() && e.d - now() < 14 * 864e5)
+    .sort((a, b) => a.d - b.d).slice(0, 3);
+  if (soonEvents.length) {
+    const box = el("div", "evbar");
+    soonEvents.forEach(e => {
+      const row = el("div", "evrow");
+      row.appendChild(el("b", null, absTime(e.d)));
+      row.appendChild(document.createTextNode(" " + e.what + (e.where ? " · " + e.where : "")));
+      box.appendChild(row);
+    });
+    v.appendChild(box);
+  }
 
   const head = el("div", "row");
   const s = el("input", "search"); s.placeholder = "search tasks"; s.value = QUERY;

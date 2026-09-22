@@ -100,6 +100,18 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .people button.on .n { background: rgba(0,0,0,.14); color: #000; }
 .people button.on .n.bad { background: #7a1c20; color: #fff; }
 
+/* up next */
+.upnext { margin: 12px 0 4px; padding: 14px 16px; border-radius: var(--r); background: var(--bg2); border: 1px solid var(--line); border-left: 4px solid var(--org); cursor: pointer; }
+.upnext.bad { border-left-color: var(--red); background: var(--red-bg); }
+.upnext-k { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--fg3); font-weight: 700; }
+.upnext-w { font-weight: 700; font-size: 1.05rem; margin-top: 4px; }
+.upnext-t { font-size: 1.5rem; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; color: var(--org); }
+.upnext.bad .upnext-t { color: var(--red); }
+.upnext-s { font-size: .82rem; color: var(--fg3); margin-top: 2px; }
+.evbar { margin: 8px 0 0; padding: 10px 14px; border-radius: var(--r); background: var(--bg2); border: 1px solid var(--line); font-size: .86rem; }
+.evrow { padding: 3px 0; color: var(--fg2); }
+.evrow b { color: var(--yel); font-weight: 600; }
+
 /* controls row */
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
 .seg { display: inline-flex; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
@@ -141,12 +153,14 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .pill.accepted { background: var(--grn-bg); color: var(--grn); }
 .pill.late { background: var(--red-bg); color: var(--red); }
 .pill.cancelled { background: var(--bg3); color: var(--fg3); text-decoration: line-through; }
+.pill.unconfirmed { background: var(--yel-bg); color: var(--yel); }
 .pill.unclear { background: var(--yel-bg); color: var(--yel); }
 .pill.critical { background: var(--red-bg); color: var(--red); }
 .t-more { margin-top: 8px; font-size: .88rem; color: var(--fg2); display: none; }
 .card.open .t-more { display: block; }
 .t-more div { margin-top: 5px; }
 .t-more b { color: var(--fg); font-weight: 600; }
+.openmail { display: inline-block; margin-top: 8px; padding: 8px 12px; background: var(--bg3); border: 1px solid var(--line); border-radius: 8px; color: var(--blu); font-weight: 600; font-size: .85rem; min-height: 40px; line-height: 24px; }
 .t-toggle { margin-top: 4px; font-size: .78rem; color: var(--fg3); background: none; border: 0; padding: 12px 0 8px; min-height: 44px; text-align: left; width: 100%; }
 .t-toggle::after { content: " ▾"; }
 .card.open .t-toggle::after { content: " ▴"; }
