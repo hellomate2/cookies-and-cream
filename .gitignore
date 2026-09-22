@@ -1,0 +1,7 @@
+# plaintext source of truth stays local; only the encrypted bundle is published
+data/tracker.json
+data/*.bak
+sync/passphrase.txt
+sync/state.json
+__pycache__/
+.DS_Store
