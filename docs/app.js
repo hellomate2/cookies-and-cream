@@ -11,7 +11,6 @@ function setData(d) { DATA = d; PLEDGES = (d && d.pledges) || []; }
 function currentWho() { return WHO === undefined ? (ME || null) : WHO; }
 const $ = (s, r = document) => r.querySelector(s);
 const el = (t, c, txt) => { const n = document.createElement(t); if (c) n.className = c; if (txt != null) n.textContent = txt; return n; };
-const esc = s => String(s == null ? "" : s);
 
 /* ---------- crypto ---------- */
 const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -149,7 +148,7 @@ function taskCard(t) {
   const rel = el("span", "rel", isDone(t) ? (t.status === "cancelled" ? "cancelled" : "done") : relTime(due));
   if (due) rel.dataset.due = t.due;
   dueBox.appendChild(rel);
-  dueBox.appendChild(el("span", "abs", due ? absTime(due) : esc(t.due_text || "")));
+  dueBox.appendChild(el("span", "abs", due ? absTime(due) : String(t.due_text || "")));
   head.appendChild(dueBox);
   card.appendChild(head);
 
@@ -278,7 +277,7 @@ function fillList(box) {
 function viewBoard() {
   const v = el("div");
   const live = (DATA.tasks || []).filter(isLive);
-  const grid = el("div", "grid");
+  const grid = el("div", "grid three");
 
   PLEDGES.forEach(name => {
     const ps = (DATA.pledge_status || []).find(p => p.name === name) || {};

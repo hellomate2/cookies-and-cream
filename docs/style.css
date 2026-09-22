@@ -41,7 +41,6 @@ button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 h2 { font-size: 1.05rem; margin: 22px 0 10px; letter-spacing: .01em; color: var(--fg); }
 h2 small { color: var(--fg3); font-weight: 500; margin-left: 6px; }
-.muted { color: var(--fg2); }
 .tiny { font-size: .78rem; color: var(--fg3); }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: var(--bg3); padding: 1px 5px; border-radius: 5px; }
 
@@ -64,7 +63,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .brand-name { font-size: .98rem; }
 .dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px #000, 0 0 0 4px var(--line); }
 .top-right { display: flex; align-items: center; gap: 10px; }
-#me { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 130px; }
+#me { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; max-width: 160px; min-height: 40px; }
 .sync { font-size: .78rem; color: var(--fg3); white-space: nowrap; }
 .sync.stale { color: var(--org); }
 .sync.dead { color: var(--red); }
@@ -89,7 +88,7 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 /* per-person strip */
 .people { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 6px; margin: 0 calc(var(--gap) * -1); padding-left: var(--gap); padding-right: var(--gap); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .people::-webkit-scrollbar { display: none; }
-.people button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; color: var(--fg2); font-weight: 600; font-size: .88rem; min-height: 36px; }
+.people button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 10px 14px; color: var(--fg2); font-weight: 600; font-size: .88rem; min-height: 44px; }
 .people button.on { background: var(--acc); color: #000; border-color: var(--acc); }
 .people button.self { border-color: #4a5566; }
 .people button.self::before { content: "\2605"; font-size: .7em; color: var(--yel); }
@@ -102,7 +101,7 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 /* controls row */
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
 .seg { display: inline-flex; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
-.seg button { border: 0; background: none; padding: 6px 12px; border-radius: 999px; color: var(--fg2); font-size: .85rem; font-weight: 600; }
+.seg button { border: 0; background: none; padding: 10px 14px; border-radius: 999px; color: var(--fg2); font-size: .85rem; font-weight: 600; min-height: 44px; }
 .seg button.on { background: var(--acc); color: #000; }
 .search { flex: 1; min-width: 160px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; outline: none; }
 .search:focus { border-color: var(--fg2); }
@@ -140,7 +139,7 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .card.open .t-more { display: block; }
 .t-more div { margin-top: 5px; }
 .t-more b { color: var(--fg); font-weight: 600; }
-.t-toggle { margin-top: 6px; font-size: .78rem; color: var(--fg3); background: none; border: 0; padding: 6px 0; min-height: 32px; }
+.t-toggle { margin-top: 4px; font-size: .78rem; color: var(--fg3); background: none; border: 0; padding: 12px 0 8px; min-height: 44px; text-align: left; width: 100%; }
 .t-toggle::after { content: " ▾"; }
 .card.open .t-toggle::after { content: " ▴"; }
 .esc { color: var(--org); }
@@ -197,7 +196,7 @@ main { padding: 4px var(--gap) 24px; max-width: 980px; margin: 0 auto; }
 .who-line .busy b { color: var(--org); }
 .who-line .away b { color: var(--blu); }
 .days { display: flex; gap: 6px; margin: 14px 0 6px; overflow-x: auto; padding-bottom: 4px; }
-.days button { flex: 0 0 auto; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; color: var(--fg2); font-weight: 600; font-size: .85rem; }
+.days button { flex: 0 0 auto; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 10px 14px; color: var(--fg2); font-weight: 600; font-size: .85rem; min-height: 44px; }
 .days button.on { background: var(--acc); color: #000; border-color: var(--acc); }
 .slot { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
 .slot:last-child { border-bottom: 0; }
