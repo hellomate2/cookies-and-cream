@@ -73,7 +73,9 @@ def main():
 
     passphrase = open(PASS, encoding="utf-8").read().strip().encode()
     if len(passphrase) < 12:
-        sys.exit("refusing to build: passphrase is under 12 characters")
+        print("WARNING: passphrase is under 12 characters. On a public repo the "
+              "ciphertext is downloadable, so a short dictionary word is crackable "
+              "offline in seconds. Make the repo private or lengthen it.", file=sys.stderr)
     salt, iv = os.urandom(16), os.urandom(12)
     key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITER).derive(passphrase)
     ct = AESGCM(key).encrypt(iv, json.dumps(data, ensure_ascii=False).encode(), None)
