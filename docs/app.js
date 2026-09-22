@@ -328,19 +328,21 @@ function fillList(box) {
 
 function viewBoard() {
   const v = el("div");
-  const live = (DATA.tasks || []).filter(isLive);
+  const todoAll = (DATA.tasks || []).filter(t => bucket(t) === "todo");
+  const unclearAll = (DATA.tasks || []).filter(t => bucket(t) === "unclear");
   const grid = el("div", "grid three");
 
   PLEDGES.forEach(name => {
     const ps = (DATA.pledge_status || []).find(p => p.name === name) || {};
     const ban = banFor(name);
-    const mine = sortTasks(live.filter(t => ownedBy(t, name)));
+    const mine = sortTasks(todoAll.filter(t => ownedBy(t, name)));
     const late = mine.filter(t => { const d = parseDue(t.due); return d && d < now(); });
+    const murky = unclearAll.filter(t => ownedBy(t, name)).length;
 
     const c = el("div", "p-card" + (name === ME ? " mine" : "") + (ban ? " banned" : ""));
     const h = el("div", "p-head");
     h.appendChild(el("div", "p-name", name));
-    h.appendChild(el("div", "p-count", `${mine.length} open${late.length ? " · " + late.length + " late" : ""}`));
+    h.appendChild(el("div", "p-count", `${mine.length} to do${late.length ? " · " + late.length + " late" : ""}${murky ? " · " + murky + " unclear" : ""}`));
     c.appendChild(h);
 
     if (ban) {
