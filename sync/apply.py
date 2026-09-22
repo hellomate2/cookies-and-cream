@@ -12,8 +12,9 @@ Patch shape (every key optional):
   "tasks_update":   [ {"match": "<substring of what>", "status": "accepted",
                        "status_evidence": "...", "due": "...", "notes": "..."} ],
   "rules_add":      [ <rule object> ],
-  "bans_add":       [ {"name": "Dev", "from": "ISO", "until": "ISO",
-                       "by": "Full Name", "reason": "..."} ],
+  "bans_add":       [ {"name": "Dev", "from": "ISO", "until": "ISO or null if indefinite",
+                       "by": "Full Name", "reason": "...",
+                       "scope": null or "what the ban is limited to, if not total"} ],
   "bans_clear":     [ "Dev" ],
   "punishments_add":[ {"name": "Paul", "text": "..."} ],
   "heat":           [ {"name": "Paul", "text": "..."} ],
@@ -119,7 +120,7 @@ def main():
         if not p:
             changed.append("WARNING unknown pledge in bans_add: %r" % b.get("name"))
             continue
-        rec = {k: b.get(k) for k in ("from", "until", "by", "reason")}
+        rec = {k: b.get(k) for k in ("from", "until", "by", "reason", "scope")}
         if not any(x.get("until") == rec["until"] and x.get("by") == rec["by"] for x in p["bans"]):
             p["bans"].append(rec)
             changed.append(f"{b['name']}: banned until {rec['until']} by {rec['by']}")
